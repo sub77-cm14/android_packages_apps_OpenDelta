@@ -78,10 +78,17 @@ import eu.chainfire.opendelta.NetworkState.OnNetworkStateListener;
 import eu.chainfire.opendelta.Scheduler.OnWantUpdateCheckListener;
 import eu.chainfire.opendelta.ScreenState.OnScreenStateListener;
 
+import java.io.ByteArrayOutputStream;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+
+import java.net.HttpURLConnection;
+
 public class UpdateService extends Service implements OnNetworkStateListener,
 OnBatteryStateListener, OnScreenStateListener,
 OnWantUpdateCheckListener, OnSharedPreferenceChangeListener {
     private static final int HTTP_READ_TIMEOUT = 30000;
+    private static final int HTTP_SOCKET_TIMEOUT = 30000;
     private static final int HTTP_CONNECTION_TIMEOUT = 30000;
 
     public static void start(Context context) {
@@ -575,9 +582,9 @@ OnWantUpdateCheckListener, OnSharedPreferenceChangeListener {
     private byte[] downloadUrlMemory(String url) {
         Logger.d("download: %s", url);
 
-        HttpsURLConnection urlConnection = null;
+        HttpURLConnection urlConnection = null;
         try {
-            urlConnection = setupHttpsRequest(url);
+            urlConnection = setupHttpRequest(url);
             if(urlConnection == null) {
                 return null;
             }
@@ -607,12 +614,35 @@ OnWantUpdateCheckListener, OnSharedPreferenceChangeListener {
         }
     }
 
+    private HttpURLConnection setupHttpRequest(String urlStr){
+        URL url;
+        HttpURLConnection urlConnection = null;
+        try {
+            url = new URL(urlStr);
+            urlConnection = (HttpURLConnection) url.openConnection();
+            urlConnection.setConnectTimeout(HTTP_CONNECTION_TIMEOUT);
+            urlConnection.setReadTimeout(HTTP_SOCKET_TIMEOUT);
+            urlConnection.setRequestMethod("GET");
+            urlConnection.setDoInput(true);
+            urlConnection.connect();
+            int code = urlConnection.getResponseCode();
+            if (code != HttpURLConnection.HTTP_OK) {
+                Logger.d("response: %d", code);
+                return null;
+            }
+            return urlConnection;
+        } catch (Exception e) {
+            Logger.i("Failed to connect to server" + e.getMessage());
+            return null;
+        }
+    }
+
     private String downloadUrlMemoryAsString(String url) {
         Logger.d("download: %s", url);
 
-        HttpsURLConnection urlConnection = null;
+        HttpURLConnection urlConnection = null;
         try {
-            urlConnection = setupHttpsRequest(url);
+            urlConnection = setupHttpRequest(url);
             if(urlConnection == null){
                 return null;
             }
@@ -833,9 +863,9 @@ OnWantUpdateCheckListener, OnSharedPreferenceChangeListener {
     private long getUrlDownloadSize(String url) {
         Logger.d("getUrlDownloadSize: %s", url);
 
-        HttpsURLConnection urlConnection = null;
+        HttpURLConnection urlConnection = null;
         try {
-            urlConnection = setupHttpsRequest(url);
+            urlConnection = setupHttpRequest(url);
             if(urlConnection == null){
                 return 0;
             }
@@ -852,6 +882,7 @@ OnWantUpdateCheckListener, OnSharedPreferenceChangeListener {
             }
         }
     }
+
 
     private String getNewestFullBuild() {
         Logger.d("Checking for latest full build");
